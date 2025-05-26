@@ -1,4 +1,3 @@
-setwd("/Users/nguyenquannhuhao/Documents/RStudio/Dengue_placement/Hao")
 library(tidyverse)
 library(rstan)
 library(purrr)

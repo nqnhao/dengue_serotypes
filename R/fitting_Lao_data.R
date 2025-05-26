@@ -6,9 +6,8 @@ library(ggplot2)
 library(purrr)
 
 ### LAO 2009
-setwd("/Users/nguyenquannhuhao/Documents/RStudio/Dengue_placement/Hao")
 
-data_lao <- read_excel("/Users/nguyenquannhuhao/Documents/RStudio/Dengue_placement/Data_Lao.xlsx")
+data_lao <- read_excel("data/Data_Lao.xlsx")
 
 ### Serotype 1 & 2
 
@@ -77,7 +76,7 @@ fit <- function(data){
     age_fine = age_fine,
     n_age_fine = n_age_fine
   )
-  stan_model <- stan_model("simulation_denv_2_serotypes.stan")
+  stan_model <- stan_model("stan/simulation_denv_2_serotypes.stan")
   fit <- sampling(stan_model, data = stan_data, iter = 2000, chains = 4)
 }
 

@@ -7,10 +7,8 @@ library(ggplot2)
 library(purrr)
 
 ### VIETNAM
-setwd("/Users/nguyenquannhuhao/Documents/RStudio/Dengue_placement/Hao")
 
-
-data_vietnam <- read_excel("/Users/nguyenquannhuhao/Documents/RStudio/Dengue_placement/cleaned_data_dengue_vietnam.xlsx")
+data_vietnam <- read_excel("data/cleaned_data_dengue_vietnam.xlsx")
 
 ### Serotype 1 & 2
 data_vietnam_total <- data_vietnam %>%
@@ -187,7 +185,7 @@ fit <- function(data){
     age_fine = age_fine,
     n_age_fine = n_age_fine
   )
-  stan_model <- stan_model("simulation_denv_2_serotypes.stan")
+  stan_model <- stan_model("stan/simulation_denv_2_serotypes.stan")
   fit <- sampling(stan_model, data = stan_data, iter = 2000, chains = 4)
 }
 
@@ -202,7 +200,7 @@ print(fit_Vietnam_KH, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), prob
 
 ## Data visualisation
 
-data_vietnam <- data_vietnam %>%
+data_vietnam_total <- data_vietnam_total %>%
   mutate(
     p_s = n_s/n_tested,
     p_x1 =  n_denv1/n_tested,
@@ -218,10 +216,10 @@ data_vietnam <- data_vietnam %>%
     lower_q_x2 = q_x2 - 1.96 * sqrt(q_x2 * (1 - q_x2) / n_tested),
     upper_q_x2 = q_x2 + 1.96 * sqrt(q_x2 * (1 - q_x2) / n_tested),
   )
-ggplot(data=data_vietnam) + geom_line(aes(x = age, y = p_s, colour = "p_s")) + geom_line(aes(x = age, y = p_x1, colour = "p_x1")) + geom_line(aes(x= age, y = p_x2, colour = "p_x2")) + geom_line(aes(x = age, y = p_x12, colour = "p_x12"))+ theme_minimal()
+ggplot(data=data_vietnam_total) + geom_line(aes(x = age, y = p_s, colour = "p_s")) + geom_line(aes(x = age, y = p_x1, colour = "p_x1")) + geom_line(aes(x= age, y = p_x2, colour = "p_x2")) + geom_line(aes(x = age, y = p_x12, colour = "p_x12"))+ theme_minimal()
 
 
-vietnam_long <- data_vietnam %>%
+vietnam_long <- data_vietnam_total %>%
   pivot_longer(cols = c(p_s, p_x1, p_x2, p_x12, q_x1, q_x2, q_x12, p_1_2, p_2_1, lower_q_x1, upper_q_x1, lower_q_x2, upper_q_x2),
                names_to = "prob_type",
                values_to = "probability") %>% 
@@ -230,7 +228,7 @@ vietnam_long <- data_vietnam %>%
 #filter(prob_type %in% c("p_s", "p_x1", "p_x2", "p_x12"))
 #filter(prob_type %in% c("p_1_2", "p_2_1"))
 
-ggplot(data_vietnam, aes(x = factor(age))) +
+ggplot(data_vietnam_total, aes(x = factor(age))) +
   geom_point(aes(y = q_x1, colour = "DENV1"), size = 2) +
   geom_errorbar(aes(ymin = lower_q_x1, ymax = upper_q_x1, colour = "DENV1"), width = 0.2) +
   geom_point(aes(y = q_x2, colour = "DENV2"), size = 2) +
@@ -424,7 +422,9 @@ ggplot(df_ppc, aes(x = age)) +
 
 ## Check Indepence of 2 serotypes
 
-vietnam_list_with_p <- data_vietnam %>%
+### Total
+
+vietnam_list_with_p <- data_vietnam_total %>%
     mutate(
       p_s = n_s / n_tested,
       p_x1 = n_denv1 / n_tested,
@@ -445,6 +445,115 @@ vietnam_list_with_p <- data_vietnam %>%
       )$p.value
     ) %>%
     ungroup()
+
+vietnam_all_pval <- bind_rows(vietnam_list_with_p)
+
+ggplot(vietnam_all_pval, aes(x = age)) +
+  geom_line(aes(y = p_x12, colour = "Observed p_x12")) +
+  geom_line(aes(y = q_x12, colour = "Estimated q_x12")) +
+  geom_text(aes(y = p_x12 + 0.02, label = ifelse(p_value < 0.05, "p<0.05", sprintf("p=%.3f", p_value))), size = 2, hjust = 0) +
+  theme_minimal() +
+  theme(legend.position = "top") + 
+  labs(
+    x = "Age", y = "Probability",
+    colour = "Legend"
+  )
+
+
+ggplot(vietnam_all_pval, aes(x = factor(age))) +
+  geom_point(aes(y = p_x12, colour = "Observed", shape = p_value < 0.05), size = 3) +
+  geom_point(aes(y = q_x12, colour = "Expected"), size = 3) +
+  geom_text(
+    aes(
+      y = p_x12 + 0.02,
+      label = ifelse(p_value < 0.05, "p<0.05", sprintf("p=%.3f", p_value))
+    ),
+    size = 3, hjust = 0
+  ) +
+  scale_shape_manual(values = c(`FALSE` = 1, `TRUE` = 19), name = "p < 0.05") +
+  theme_bw() +
+  theme(legend.position = "top") +
+  labs(
+    x = "Age midpoint", y = "Probability",
+    colour = "Seroprevalence of DENV1 + DENV2"
+  )
+
+### HCM
+vietnam_list_with_p <- data_vietnam_HCM %>%
+  mutate(
+    p_s = n_s / n_tested,
+    p_x1 = n_denv1 / n_tested,
+    p_x2 = n_denv2 / n_tested,
+    p_x12 = n_denv12 / n_tested,
+    q_x1 = (n_denv1 + n_denv12) / n_tested,
+    q_x2 = (n_denv2 + n_denv12) / n_tested,
+    q_x12 = q_x1 * q_x2
+  ) %>%
+  rowwise() %>%
+  mutate(
+    expected_infected = round(n_tested * q_x12),
+    expected_uninfected = n_tested - expected_infected,
+    observed_uninfected = n_tested - n_denv12,
+    p_value = fisher.test(
+      matrix(c(n_denv12, observed_uninfected,
+               expected_infected, expected_uninfected), nrow = 2)
+    )$p.value
+  ) %>%
+  ungroup()
+
+vietnam_all_pval <- bind_rows(vietnam_list_with_p)
+
+ggplot(vietnam_all_pval, aes(x = age)) +
+  geom_line(aes(y = p_x12, colour = "Observed p_x12")) +
+  geom_line(aes(y = q_x12, colour = "Estimated q_x12")) +
+  geom_text(aes(y = p_x12 + 0.02, label = ifelse(p_value < 0.05, "p<0.05", sprintf("p=%.3f", p_value))), size = 2, hjust = 0) +
+  theme_minimal() +
+  theme(legend.position = "top") + 
+  labs(
+    x = "Age", y = "Probability",
+    colour = "Legend"
+  )
+
+
+ggplot(vietnam_all_pval, aes(x = factor(age))) +
+  geom_point(aes(y = p_x12, colour = "Observed", shape = p_value < 0.05), size = 3) +
+  geom_point(aes(y = q_x12, colour = "Expected"), size = 3) +
+  geom_text(
+    aes(
+      y = p_x12 + 0.02,
+      label = ifelse(p_value < 0.05, "p<0.05", sprintf("p=%.3f", p_value))
+    ),
+    size = 3, hjust = 0
+  ) +
+  scale_shape_manual(values = c(`FALSE` = 1, `TRUE` = 19), name = "p < 0.05") +
+  theme_bw() +
+  theme(legend.position = "top") +
+  labs(
+    x = "Age midpoint", y = "Probability",
+    colour = "Seroprevalence of DENV1 + DENV2"
+  )
+### Khanh Hoa
+vietnam_list_with_p <- data_vietnam_KH %>%
+  mutate(
+    p_s = n_s / n_tested,
+    p_x1 = n_denv1 / n_tested,
+    p_x2 = n_denv2 / n_tested,
+    p_x12 = n_denv12 / n_tested,
+    q_x1 = (n_denv1 + n_denv12) / n_tested,
+    q_x2 = (n_denv2 + n_denv12) / n_tested,
+    q_x12 = q_x1 * q_x2
+  ) %>%
+  rowwise() %>%
+  mutate(
+    expected_infected = round(n_tested * q_x12),
+    expected_uninfected = n_tested - expected_infected,
+    observed_uninfected = n_tested - n_denv12,
+    p_value = fisher.test(
+      matrix(c(n_denv12, observed_uninfected,
+               expected_infected, expected_uninfected), nrow = 2)
+    )$p.value
+  ) %>%
+  ungroup()
 
 vietnam_all_pval <- bind_rows(vietnam_list_with_p)
 
