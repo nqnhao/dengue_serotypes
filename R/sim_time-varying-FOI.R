@@ -55,12 +55,13 @@ x12 <- function(t, lambda1, lambda2, sigma12, sigma21) {
 # Data simulation
 
 lambda1_fn <- function(age) ifelse(age <= 40, 0.07, 0.03)
-lambda2_fn <- function(age) ifelse(age <= 40, 0.04, 0.08)
+lambda2_fn <- function(age) ifelse(age <= 40, 0.08, 0.04)
 sigma12 <- 1.5  # Enhancement of DENV2 after DENV1
 sigma21 <- 0.7  # Protection of DENV1 after DENV2
 
 age_bins <- seq(5, 65, by = 5)
 age_midpoints <- age_bins[-length(age_bins)] + diff(age_bins) / 2
+
 
 set.seed(123)
 

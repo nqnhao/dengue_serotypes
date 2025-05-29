@@ -56,8 +56,8 @@ x12 <- function(t, lambda1, lambda2, sigma12, sigma21) {
 
 lambda1 <- 0.05 # DENV1 FOI  (Review of Peru)
 lambda2 <- 0.04 # DENV2 FOI
-sigma12 <- 1.5  # Enhancement of DENV2 after DENV1
-sigma21 <- 0.7  # Protection of DENV1 after DENV2
+sigma12 <- 15  # Enhancement of DENV2 after DENV1
+sigma21 <- 0.1  # Protection of DENV1 after DENV2
 
 #lambda1 <- 0.01 # DENV1 FOI  (Review of Peru)
 #lambda2 <- 0.05 # DENV2 FOI
@@ -76,7 +76,7 @@ sim_data <- map_dfr(age_midpoints, function(age) {
   p_x2 <- x2(age, lambda1, lambda2, sigma21)
   p_x12 <- x12(age, lambda1, lambda2, sigma12, sigma21)
   
-  n_per_bin <- sample(100:200, 1)
+  n_per_bin <- sample(1000:2000, 1)
   probs <- c(p_s, p_x1, p_x2, p_x12)
  # probs <- probs / sum(probs)
   
@@ -101,48 +101,48 @@ sim_data
 
 #### Time-varying FOI - Simulation
 # FOI functions that change with age
-lambda1_fn <- function(age) ifelse(age <= 40, 0.07, 0.03)
-lambda2_fn <- function(age) ifelse(age <= 40, 0.04, 0.08)
+#lambda1_fn <- function(age) ifelse(age <= 40, 0.07, 0.03)
+#lambda2_fn <- function(age) ifelse(age <= 40, 0.04, 0.08)
 
 # Other parameters
-sigma12 <- 1.5  # Enhancement of DENV2 after DENV1
-sigma21 <- 0.7  # Protection of DENV1 after DENV2
+#sigma12 <- 1.5  # Enhancement of DENV2 after DENV1
+#sigma21 <- 0.7  # Protection of DENV1 after DENV2
 
 # Simulate data with dynamic FOIs
-age_bins <- seq(5, 65, by = 5)
-age_midpoints <- age_bins[-length(age_bins)] + diff(age_bins) / 2
+#age_bins <- seq(5, 65, by = 5)
+#age_midpoints <- age_bins[-length(age_bins)] + diff(age_bins) / 2
 
-set.seed(123)
+#set.seed(123)
 
-sim_data <- map_dfr(age_midpoints, function(age) {
-  l1 <- lambda1_fn(age)
-  l2 <- lambda2_fn(age)
+#sim_data <- map_dfr(age_midpoints, function(age) {
+#  l1 <- lambda1_fn(age)
+#  l2 <- lambda2_fn(age)
   
-  p_s <- s(age, l1, l2)
-  p_x1 <- x1(age, l1, l2, sigma12)
-  p_x2 <- x2(age, l1, l2, sigma21)
-  p_x12 <- x12(age, l1, l2, sigma12, sigma21)
+#  p_s <- s(age, l1, l2)
+#  p_x1 <- x1(age, l1, l2, sigma12)
+#  p_x2 <- x2(age, l1, l2, sigma21)
+#  p_x12 <- x12(age, l1, l2, sigma12, sigma21)
   
-  probs <- c(p_s, p_x1, p_x2, p_x12)
-  n_per_bin <- sample(100:200, 1)
+#  probs <- c(p_s, p_x1, p_x2, p_x12)
+#  n_per_bin <- sample(100:200, 1)
   
-  counts <- rmultinom(1, size = n_per_bin, prob = probs)
+#  counts <- rmultinom(1, size = n_per_bin, prob = probs)
   
-  tibble(
-    age = age,
-    n_tested = n_per_bin,
-    n_s = counts[1],
-    n_denv1 = counts[2],
-    n_denv2 = counts[3],
-    n_denv12 = counts[4],
-    p_s = p_s,
-    p_x1 =  p_x1,
-    p_x2 =  p_x2,
-    p_x12 =  p_x12,
-    lambda1 = l1,
-    lambda2 = l2
-  )
-})
+#  tibble(
+#    age = age,
+#    n_tested = n_per_bin,
+#    n_s = counts[1],
+#    n_denv1 = counts[2],
+#    n_denv2 = counts[3],
+#    n_denv12 = counts[4],
+#    p_s = p_s,
+#    p_x1 =  p_x1,
+#    p_x2 =  p_x2,
+#    p_x12 =  p_x12,
+#    lambda1 = l1,
+#    lambda2 = l2
+#  )
+#})
 
 
 # FITTING
@@ -163,7 +163,7 @@ stan_data <- list(
 
 
 
-stan_model <- stan_model("simulation_denv_2_serotypes.stan")
+stan_model <- stan_model("stan/simulation_denv_2_serotypes.stan")
 
 expose_stan_functions(stan_model)
 s(13.4, 0.32, 0.12)
@@ -176,6 +176,8 @@ p_x2(13.4, 0.32, 0.12, 2)
 
 x12(13.4, 0.32, 0.12, 1.5, 2)
 p_x12(13.4, 0.32, 0.12, 1.5, 2)
+x12(13.4, 0.32, 0.12, 1, 1)
+p_x12(13.4, 0.32, 0.12, 1, 1)
 
 fit <- sampling(stan_model, data = stan_data, iter = 2000, chains = 4, seed = 234)
 
@@ -339,10 +341,8 @@ wrap_plots(ppc_prob_plots, ncol = 2)
 
 
 ### Check Fisher test
-sim_list_with_p <- map(years, function(y) {
-  df <- sim_data %>%
+sim_list_with_p <- sim_data %>%
     mutate(
-      year = y,
       p_s = n_s / n_tested,
       p_x1 = n_denv1 / n_tested,
       p_x2 = n_denv2 / n_tested,
@@ -362,8 +362,6 @@ sim_list_with_p <- map(years, function(y) {
       )$p.value
     ) %>%
     ungroup()
-  return(df)
-})
 
 sim_all_pval <- bind_rows(sim_list_with_p)
 

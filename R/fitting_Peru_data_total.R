@@ -6,6 +6,7 @@ library(ggplot2)
 library(purrr)
 #library(writexl)
 
+options(mc.cores=4)
 ## DATA CLEANING: SEROTYPES 1 & 2
 data_peru <- read_excel("data/cohorts_data.xlsx")
 
@@ -208,7 +209,7 @@ ggplot(peru_all_pval, aes(x = factor(age))) +
 ## FITTING DATA EACH YEAR
 
 
-fit <- function(data){
+fit <- function(data, iterations = 1000){
   age_fine <- seq(5, max(data$age), by=1)
   n_age_fine <- length(age_fine)
   stan_data <- list(
@@ -224,17 +225,15 @@ fit <- function(data){
     n_age_fine = n_age_fine
   )
   stan_model <- stan_model("stan/simulation_denv_2_serotypes.stan")
-  fit <- sampling(stan_model, data = stan_data, iter = 2000, chains = 4, control = list(adapt_delta = 0.99, max_treedepth = 15))
+  fit <- sampling(stan_model, data = stan_data, iter = iterations, chains = 4, control = list(adapt_delta = 0.99, max_treedepth = 15))
 }
 
 
 
+#### Fit all datasets
 fit_peru_2010 <- fit(peru_2010)
 print(fit_peru_2010, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits = 3)
-
-shinystan::launch_shinystan(fit_peru_2010)
-
-#### Fit all datasets
+#shinystan::launch_shinystan(fit_peru_2010)
 
 fit_peru_2008 <- fit(peru_2008)
 print(fit_peru_2008, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
@@ -242,10 +241,10 @@ print(fit_peru_2008, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs
 fit_peru_2006 <- fit(peru_2006)
 print(fit_peru_2006, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_2004 <- fit(peru_2004)
+fit_peru_2004 <- fit(peru_2004, iterations = 10000)
 print(fit_peru_2004, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
-
-fit_peru_2002 <- fit(peru_2002)
+                
+fit_peru_2002 <- fit(peru_2002, iterations = 10000)
 print(fit_peru_2002, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
 fit_peru_2001 <- fit(peru_2001)

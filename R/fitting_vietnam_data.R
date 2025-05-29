@@ -200,6 +200,7 @@ print(fit_Vietnam_KH, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), prob
 
 ## Data visualisation
 
+### Total
 data_vietnam_total <- data_vietnam_total %>%
   mutate(
     p_s = n_s/n_tested,
@@ -240,7 +241,88 @@ ggplot(data_vietnam_total, aes(x = factor(age))) +
     colour = "Seroprevalence"
   )
 
-## PPC - Total data
+### Ho Chi Minh City
+data_vietnam_HCM <- data_vietnam_HCM %>%
+  mutate(
+    p_s = n_s/n_tested,
+    p_x1 =  n_denv1/n_tested,
+    p_x2 =  n_denv2/n_tested,
+    p_x12 =  n_denv12/n_tested,
+    q_x1 = (n_denv1 + n_denv12) / n_tested,
+    q_x2 = (n_denv2 + n_denv12) / n_tested,
+    q_x12 = q_x1 * q_x2,
+    p_1_2 = p_x12 / q_x2,
+    p_2_1 = p_x12 / q_x1,
+    lower_q_x1 = q_x1 - 1.96 * sqrt(q_x1 * (1 - q_x1) / n_tested),
+    upper_q_x1 = q_x1 + 1.96 * sqrt(q_x1 * (1 - q_x1) / n_tested),
+    lower_q_x2 = q_x2 - 1.96 * sqrt(q_x2 * (1 - q_x2) / n_tested),
+    upper_q_x2 = q_x2 + 1.96 * sqrt(q_x2 * (1 - q_x2) / n_tested),
+  )
+ggplot(data=data_vietnam_HCM) + geom_line(aes(x = age, y = p_s, colour = "p_s")) + geom_line(aes(x = age, y = p_x1, colour = "p_x1")) + geom_line(aes(x= age, y = p_x2, colour = "p_x2")) + geom_line(aes(x = age, y = p_x12, colour = "p_x12"))+ theme_minimal()
+
+
+vietnam_long <- data_vietnam_HCM %>%
+  pivot_longer(cols = c(p_s, p_x1, p_x2, p_x12, q_x1, q_x2, q_x12, p_1_2, p_2_1, lower_q_x1, upper_q_x1, lower_q_x2, upper_q_x2),
+               names_to = "prob_type",
+               values_to = "probability") %>% 
+  #filter(prob_type %in% c("p_x12", "q_x1", "q_x2", "q_x12")) #%>% 
+  filter(prob_type %in% c("q_x1", "q_x2","lower_q_x1", "upper_q_x1", "lower_q_x2", "upper_q_x2"))
+#filter(prob_type %in% c("p_s", "p_x1", "p_x2", "p_x12"))
+#filter(prob_type %in% c("p_1_2", "p_2_1"))
+
+ggplot(data_vietnam_HCM, aes(x = factor(age))) +
+  geom_point(aes(y = q_x1, colour = "DENV1"), size = 2) +
+  geom_errorbar(aes(ymin = lower_q_x1, ymax = upper_q_x1, colour = "DENV1"), width = 0.2) +
+  geom_point(aes(y = q_x2, colour = "DENV2"), size = 2) +
+  geom_errorbar(aes(ymin = lower_q_x2, ymax = upper_q_x2, colour = "DENV2"), width = 0.2) +
+  theme_bw() +
+  theme(legend.position = "top") + 
+  labs(
+    x = "Age", y = "Probability",
+    colour = "Seroprevalence"
+  )
+### Khanh Hoa
+data_vietnam_KH <- data_vietnam_KH %>%
+  mutate(
+    p_s = n_s/n_tested,
+    p_x1 =  n_denv1/n_tested,
+    p_x2 =  n_denv2/n_tested,
+    p_x12 =  n_denv12/n_tested,
+    q_x1 = (n_denv1 + n_denv12) / n_tested,
+    q_x2 = (n_denv2 + n_denv12) / n_tested,
+    q_x12 = q_x1 * q_x2,
+    p_1_2 = p_x12 / q_x2,
+    p_2_1 = p_x12 / q_x1,
+    lower_q_x1 = q_x1 - 1.96 * sqrt(q_x1 * (1 - q_x1) / n_tested),
+    upper_q_x1 = q_x1 + 1.96 * sqrt(q_x1 * (1 - q_x1) / n_tested),
+    lower_q_x2 = q_x2 - 1.96 * sqrt(q_x2 * (1 - q_x2) / n_tested),
+    upper_q_x2 = q_x2 + 1.96 * sqrt(q_x2 * (1 - q_x2) / n_tested),
+  )
+ggplot(data=data_vietnam_KH) + geom_line(aes(x = age, y = p_s, colour = "p_s")) + geom_line(aes(x = age, y = p_x1, colour = "p_x1")) + geom_line(aes(x= age, y = p_x2, colour = "p_x2")) + geom_line(aes(x = age, y = p_x12, colour = "p_x12"))+ theme_minimal()
+
+
+vietnam_long <- data_vietnam_KH %>%
+  pivot_longer(cols = c(p_s, p_x1, p_x2, p_x12, q_x1, q_x2, q_x12, p_1_2, p_2_1, lower_q_x1, upper_q_x1, lower_q_x2, upper_q_x2),
+               names_to = "prob_type",
+               values_to = "probability") %>% 
+  #filter(prob_type %in% c("p_x12", "q_x1", "q_x2", "q_x12")) #%>% 
+  filter(prob_type %in% c("q_x1", "q_x2","lower_q_x1", "upper_q_x1", "lower_q_x2", "upper_q_x2"))
+#filter(prob_type %in% c("p_s", "p_x1", "p_x2", "p_x12"))
+#filter(prob_type %in% c("p_1_2", "p_2_1"))
+
+ggplot(data_vietnam_KH, aes(x = factor(age))) +
+  geom_point(aes(y = q_x1, colour = "DENV1"), size = 2) +
+  geom_errorbar(aes(ymin = lower_q_x1, ymax = upper_q_x1, colour = "DENV1"), width = 0.2) +
+  geom_point(aes(y = q_x2, colour = "DENV2"), size = 2) +
+  geom_errorbar(aes(ymin = lower_q_x2, ymax = upper_q_x2, colour = "DENV2"), width = 0.2) +
+  theme_bw() +
+  theme(legend.position = "top") + 
+  labs(
+    x = "Age", y = "Probability",
+    colour = "Seroprevalence"
+  )
+
+## Posterior Predictive Check - Total data
 age_fine <- seq(0, max(data_vietnam_total$age), by=1)
 n_age_fine <- length(age_fine)
 stan_data <- list(
