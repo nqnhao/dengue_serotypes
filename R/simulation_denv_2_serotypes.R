@@ -4,6 +4,8 @@ library(purrr)
 library(patchwork)
 library(bayesplot)
 library(ggplot2)
+library(ggtext)
+
 
 # Susceptible to both serotypes
 s <- function(t, lambda1, lambda2) {
@@ -57,7 +59,7 @@ x12 <- function(t, lambda1, lambda2, sigma12, sigma21) {
 lambda1 <- 0.05 # DENV1 FOI  (Review of Peru)
 lambda2 <- 0.04 # DENV2 FOI
 sigma12 <- 15  # Enhancement of DENV2 after DENV1
-sigma21 <- 0.1  # Protection of DENV1 after DENV2
+sigma21 <- 0.7  # Protection of DENV1 after DENV2
 
 #lambda1 <- 0.01 # DENV1 FOI  (Review of Peru)
 #lambda2 <- 0.05 # DENV2 FOI
@@ -182,8 +184,8 @@ p_x12(13.4, 0.32, 0.12, 1, 1)
 fit <- sampling(stan_model, data = stan_data, iter = 2000, chains = 4, seed = 234)
 
 
-print(fit, pars = c("lambda1", "lambda2", "sigma12", "sigma21"))
-shinystan::launch_shinystan(fit)
+print(fit, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), digits = 4)
+#shinystan::launch_shinystan(fit)
 
 ### Posterior predictive check
 
@@ -263,12 +265,18 @@ ggplot(df_ppc, aes(x = age)) +
   
   facet_wrap(~ compartment) +
   labs(
-    title = "Posterior Predictive Check",
+    title = "<span style='font-size:16pt'><b>Posterior Predictive Check of age-stratified infection probabilities: Model estimates versus simulated data</b></span><br>
+            <span style='font-size:12pt'>  </span><br>
+            <span style='font-size:12pt'>The red lines represent the model's mean posterior predictions, and the shaded areas show the 95% credible intervals.</span><br>
+            <span style='font-size:12pt'>Observed data points with binomial confidence intervals are overlaid as black points and error bars. </span>",
     x = "Age", y = "Probability"
   ) +
-  theme_minimal()
-
-
+  theme_bw()+
+  theme(
+    plot.title = ggtext::element_markdown(),
+    plot.title.position = "plot",
+    strip.text = element_text(size = 14)
+  )
 
 ########
 ## Count PPC
@@ -334,7 +342,11 @@ ppc_prob_plots <- map(1:4, function(k) {
       x = "Age",
       y = "Probability"
     ) +
-    theme_minimal()
+    theme_minimal()+
+    theme(
+      plot.title = ggtext::element_markdown(hjust = 0.5),
+      plot.title.position = "plot"
+    )
 })
 
 wrap_plots(ppc_prob_plots, ncol = 2)

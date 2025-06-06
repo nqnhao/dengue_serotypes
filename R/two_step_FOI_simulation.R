@@ -15,7 +15,7 @@ current_year <- 2025
 cutoff_year <- 2000
 cutoff_age <- current_year - cutoff_year
 
-# --- Model functions (unchanged) ---
+# --- Model functions ---
 s <- function(t, lambda1, lambda2) {
   exp(-t * (lambda1 + lambda2))
 }
@@ -86,9 +86,7 @@ sim_data <- map_dfr(age_midpoints, function(age) {
     
     # Step 2: continue (current year - cut-off year) more years under lambda1_b
     p_s <- S1 * s(t2, lambda1_b, lambda2)
-    #p_x1 <- X1_1 * s(t2, lambda1_b, lambda2) + S1 * x1(t2, lambda1_b, lambda2, sigma12)
     p_x1 <- X1_1 + S1 * x1(t2, lambda1_b, lambda2, sigma12)
-    #p_x2 <- X2_1 * s(t2, lambda1_b, lambda2) + S1 * x2(t2, lambda1_b, lambda2, sigma21)
     p_x2 <- X2_1 + S1 * x2(t2, lambda1_b, lambda2, sigma21)
     p_x12 <- X12_1 +
       X1_1 * x2(t2, lambda1_b, lambda2, sigma21) +
@@ -115,11 +113,16 @@ sim_data <- map_dfr(age_midpoints, function(age) {
     p_x1 = probs[2],
     p_x2 = probs[3],
     p_x12 = probs[4],
-    sum = sum(p_s, p_x1, p_x2, p_x12)
+    sum = sum(p_s, p_x1, p_x2, p_x12) ## exceed 1 slightly????
   )
 })
 
 sim_data
+
+sim_data %>%
+  mutate(diff_from_1 = sum - 1) %>%
+  arrange(desc(diff_from_1))
+
 
 # FITTING
 age_fine <- seq(5, max(sim_data$age), by=1)
@@ -222,4 +225,5 @@ ggplot(df_ppc, aes(x = age)) +
     title = "Posterior Predictive Check",
     x = "Age", y = "Probability"
   ) +
-  theme_minimal()
+  theme_bw() +
+  theme(strip.text = element_text(size = 14))

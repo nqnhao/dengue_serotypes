@@ -4,6 +4,7 @@ library(table1)
 library(dplyr)
 library(ggplot2)
 library(purrr)
+library(ggtext)
 #library(writexl)
 
 options(mc.cores=4)
@@ -87,9 +88,8 @@ peru_2010 <- peru_2010 %>%
   )
 ggplot(data=peru_2010) + geom_line(aes(x = age, y = p_s, colour = "p_s")) + geom_line(aes(x = age, y = p_x1, colour = "p_x1")) + geom_line(aes(x= age, y = p_x2, colour = "p_x2")) + geom_line(aes(x = age, y = p_x12, colour = "p_x12")) + theme_minimal()
 
-
+## Plot seroprevalence of DENV-1 and DENV-2
 years <- c(2010,2008, 2006, 2004, 2002, 2001, 1999, 1996, 1995, 1994, 1993)
-#years <- c(2010,2008, 2006, 2004, 2002, 2001, 1999)
 peru_list <- map(years, function(y) {
   df <- get(paste0("peru_", y))
   df %>%
@@ -114,35 +114,50 @@ peru_list <- map(years, function(y) {
 peru_all <- bind_rows(peru_list) #%>% 
   #filter(year==2010)
 
+
+ggplot(peru_all, aes(x = factor(age))) +
+  geom_point(aes(y = q_x1, colour = "DENV1"), size = 1, position=position_dodge(width=2)) +
+  geom_errorbar(aes(ymin = lower_q_x1, ymax = upper_q_x1, colour = "DENV1"), width = 0.4, position=position_dodge(width=2)) +
+  geom_point(aes(y = q_x2, colour = "DENV2"), size = 1, position=position_dodge(width=2)) +
+  geom_errorbar(aes(ymin = lower_q_x2, ymax = upper_q_x2, colour = "DENV2"), width = 0.4, position=position_dodge(width=2)) +
+  facet_wrap(~ year) +
+  theme_bw() +
+  theme(legend.position = "top",
+        strip.text = element_text(size = 12)) + 
+  labs(
+    x = "Age", y = "Probability",
+    colour = "Seroprevalence"
+  )
+
+peru_all <- peru_all %>%
+  mutate(
+    age_num = as.numeric(as.character(age)),
+    age_jitter = age_num + runif(n(), -0.2, 0.2),  # apply jitter manually
+    xmin = age_jitter - 0.2,
+    xmax = age_jitter + 0.2
+  )
+
+
+############
 peru_long <- peru_all %>%
   pivot_longer(cols = c(p_s, p_x1, p_x2, p_x12, q_x1, q_x2, q_x12, p_1_2, p_2_1, lower_q_x1, upper_q_x1, lower_q_x2, upper_q_x2),
                names_to = "prob_type",
                values_to = "probability") %>% 
   #filter(prob_type %in% c("p_x12", "q_x1", "q_x2", "q_x12")) #%>% 
-  filter(prob_type %in% c("q_x1", "q_x2","lower_q_x1", "upper_q_x1", "lower_q_x2", "upper_q_x2"))
+  #filter(prob_type %in% c("q_x1", "q_x2","lower_q_x1", "upper_q_x1", "lower_q_x2", "upper_q_x2"))
   #filter(prob_type %in% c("p_s", "p_x1", "p_x2", "p_x12"))
-  #filter(prob_type %in% c("p_1_2", "p_2_1"))
+  filter(prob_type %in% c("p_1_2", "p_2_1"))
 
-ggplot(peru_all, aes(x = factor(age))) +
-  geom_point(aes(y = q_x1, colour = "DENV1"), size = 2) +
-  geom_errorbar(aes(ymin = lower_q_x1, ymax = upper_q_x1, colour = "DENV1"), width = 0.2) +
-  geom_point(aes(y = q_x2, colour = "DENV2"), size = 2) +
-  geom_errorbar(aes(ymin = lower_q_x2, ymax = upper_q_x2, colour = "DENV2"), width = 0.2) +
-  facet_wrap(~ year) +
-  theme_bw() +
-  theme(legend.position = "top") + 
-  labs(
-    x = "Age", y = "Probability",
-    colour = "Seroprevalence"
-  )
 
 ggplot(peru_long, aes(x = age, y = probability, colour = prob_type)) +
   geom_line() +
   theme_minimal() +
   labs(x = "Age", y = "Probability", colour = "Probability Type") +
   facet_wrap(~ year)
+###########
 
 
+## Testing for independence between DENV1 and DENV2
 peru_list_with_p <- map(years, function(y) {
   df <- get(paste0("peru_", y)) %>%
     mutate(
@@ -171,20 +186,6 @@ peru_list_with_p <- map(years, function(y) {
 
 peru_all_pval <- bind_rows(peru_list_with_p)
 
-
-ggplot(peru_all_pval, aes(x = age)) +
-  geom_line(aes(y = p_x12, colour = "Observed p_x12")) +
-  geom_line(aes(y = q_x12, colour = "Estimated q_x12")) +
-  geom_text(aes(y = p_x12 + 0.02, label = ifelse(p_value < 0.05, "p<0.05", sprintf("p=%.3f", p_value))), size = 2, hjust = 0) +
-  facet_wrap(~ year) +
-  theme_minimal() +
-  theme(legend.position = "top") + 
-  labs(
-    x = "Age", y = "Probability",
-    colour = "Legend"
-  )
-
-
 ggplot(peru_all_pval, aes(x = factor(age))) +
   geom_point(aes(y = p_x12, colour = "Observed", shape = p_value < 0.05), size = 2.5) +
   geom_point(aes(y = q_x12, colour = "Expected"), size = 2) +
@@ -204,12 +205,32 @@ ggplot(peru_all_pval, aes(x = factor(age))) +
     colour = "Seroprevalence of DENV1 + DENV2"
   )
 
+ggplot(peru_all_pval, aes(x = factor(age))) +
+  # Line to connect observed points
+  geom_line(aes(y = p_x12, group = year, colour = "Observed")) +
+  # Observed points with shape by significance
+  geom_point(aes(y = p_x12, colour = "Observed", shape = p_value < 0.05), size = 2.5) +
+  # Expected points
+  geom_line(aes(y = q_x12, group = year, colour = "Expected")) +
+  geom_point(aes(y = q_x12, colour = "Expected"), size = 2) +
+  # Shape and colour adjustments
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 17), name = "p < 0.05") +
+  scale_colour_manual(values = c("Observed" = "steelblue", "Expected" = "tomato")) +
+  facet_wrap(~ year) +
+  theme_bw() +
+  theme(legend.position = "top",
+        strip.text = element_text(size = 12)) +
+  labs(
+    x = "Age midpoint", y = "Probability",
+    colour = "Seroprevalence of DENV1 + DENV2"
+  )
+
 
 
 ## FITTING DATA EACH YEAR
 
 
-fit <- function(data, iterations = 1000){
+fit <- function(data, iterations = 4000){
   age_fine <- seq(5, max(data$age), by=1)
   n_age_fine <- length(age_fine)
   stan_data <- list(
@@ -231,38 +252,38 @@ fit <- function(data, iterations = 1000){
 
 
 #### Fit all datasets
-fit_peru_2010 <- fit(peru_2010)
+#fit_peru_2010 <- fit(peru_2010, iterations = 6000)
 print(fit_peru_2010, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits = 3)
 #shinystan::launch_shinystan(fit_peru_2010)
 
-fit_peru_2008 <- fit(peru_2008)
+#fit_peru_2008 <- fit(peru_2008)
 print(fit_peru_2008, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_2006 <- fit(peru_2006)
+#fit_peru_2006 <- fit(peru_2006, iterations = 6000)
 print(fit_peru_2006, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_2004 <- fit(peru_2004, iterations = 10000)
+#fit_peru_2004 <- fit(peru_2004, iterations = 20000)
 print(fit_peru_2004, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
                 
-fit_peru_2002 <- fit(peru_2002, iterations = 10000)
+#fit_peru_2002 <- fit(peru_2002)
 print(fit_peru_2002, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_2001 <- fit(peru_2001)
+#fit_peru_2001 <- fit(peru_2001)
 print(fit_peru_2001, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_1999 <- fit(peru_1999)
+#fit_peru_1999 <- fit(peru_1999)
 print(fit_peru_1999, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_1996 <- fit(peru_1996)
+#fit_peru_1996 <- fit(peru_1996)
 print(fit_peru_1996, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_1995 <- fit(peru_1995)
+#fit_peru_1995 <- fit(peru_1995)
 print(fit_peru_1995, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_1994 <- fit(peru_1994)
+#fit_peru_1994 <- fit(peru_1994)
 print(fit_peru_1994, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
-fit_peru_1993 <- fit(peru_1993)
+#fit_peru_1993 <- fit(peru_1993)
 print(fit_peru_1993, pars = c("lambda1", "lambda2", "sigma12", "sigma21"), probs = c(0.025, 0.5, 0.975), digits=3)
 
 # List of model fits and associated years
@@ -304,204 +325,219 @@ ggplot(summary_all_years, aes(x = factor(year), y = mean, ymin = q025, ymax = q9
   facet_wrap(~ parameter, scales = "free_y") +
   labs(title = "Posterior Mean and 95% CI by Year", y = "Estimate", x = "Year") +
   theme_bw()
-
-##PPC peru_2010
-age_fine <- seq(5, max(peru_2010$age), by=1)
-n_age_fine <- length(age_fine)
-stan_data <- list(
-  N = nrow(peru_2010),
-  age = peru_2010$age,
-  n_tested = peru_2010$n_tested,
-  n_s = peru_2010$n_s,
-  n_denv1 = peru_2010$n_denv1,
-  n_denv2 = peru_2010$n_denv2,
-  n_denv12 = peru_2010$n_denv12,
-  y = as.matrix(peru_2010[, c("n_s", "n_denv1", "n_denv2", "n_denv12")]),
-  age_fine = age_fine,
-  n_age_fine = n_age_fine
-)
-
-
-
-posterior <- rstan::extract(fit_peru_2010)
-
-y <- stan_data$y
-n_tested <- stan_data$n_tested  
-age <- stan_data$age            
-
-# Predicted category probabilities = count / n_tested
-# y_rep: iterations x N x 4
-pred_probs <- array(NA, dim = dim(posterior$y_rep))  # 4000 x 13 x 4
-
-for (j in 1:4) {
-  pred_probs[,,j] <- sweep(posterior$y_rep[,,j], 2, n_tested, "/")
-}
-
-make_pred_df <- function(prob_matrix, age_vec, comp_name, obs_vals, n_vals) {
-  ci <- t(apply(prob_matrix, 2, quantile, probs = c(0.025, 0.5, 0.975)))
-  tibble(
-    age = age_vec,
-    median = ci[, 2],
-    lower = ci[, 1],
-    upper = ci[, 3],
-    observed = obs_vals / n_vals,
-    lower_obs = observed - 1.96 * sqrt(observed * (1 - observed) / n_vals),
-    upper_obs = observed + 1.96 * sqrt(observed * (1 - observed) / n_vals),
-    compartment = comp_name
-  )
-}
-
-prob_s <- 1 - pred_probs[, , 2] - pred_probs[, , 3] - pred_probs[, , 4]
-df_s   <- make_pred_df(prob_s, age, "Susceptible", y[, 1], n_tested)
-df_d1   <- make_pred_df(pred_probs[,,2], age, "DENV1 only", y[, 2], n_tested)
-df_d2   <- make_pred_df(pred_probs[,,3], age, "DENV2 only", y[, 3], n_tested)
-df_d12  <- make_pred_df(pred_probs[,,4], age, "DENV1 + DENV2", y[, 4], n_tested)
-
-df_ppc <- bind_rows(df_s, df_d1, df_d2, df_d12)
-
-get_ci_fine <- function(mat) {
-  apply(mat, 2, quantile, probs = c(0.025, 0.5, 0.975))
-}
-
-ci_s    <- get_ci_fine(posterior$prob_s)
-ci_d1   <- get_ci_fine(posterior$prob_x1)
-ci_d2   <- get_ci_fine(posterior$prob_x2)
-ci_d12  <- get_ci_fine(posterior$prob_x12)
-
-age_fine <- stan_data$age_fine
-
-df_smooth <- tibble(
-  age = rep(age_fine, 4),
-  median = c(ci_s[2,], ci_d1[2,], ci_d2[2,], ci_d12[2,]),
-  lower = c(ci_s[1,], ci_d1[1,], ci_d2[1,], ci_d12[1,]),
-  upper = c(ci_s[3,], ci_d1[3,], ci_d2[3,], ci_d12[3,]),
-  compartment = rep(c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2"), each = length(age_fine))
-)
-
-df_smooth <- df_smooth %>%
-  mutate(compartment = factor(compartment, levels = c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2")))
-
-df_ppc <- df_ppc %>%
-  mutate(compartment = factor(compartment, levels = c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2")))
-
-ggplot(df_ppc, aes(x = age)) +
-  # smooth line from age_fine
-  geom_ribbon(data = df_smooth, aes(x = age, ymin = lower, ymax = upper), fill = "red", alpha = 0.15, inherit.aes = FALSE) +
-  geom_line(data = df_smooth, aes(x = age, y = median), color = "red", linewidth = 0.8, inherit.aes = FALSE) +
   
-  # predicted from y_rep
-  #geom_ribbon(aes(ymin = lower, ymax = upper), fill = "skyblue", alpha = 0.3) +
-  #geom_line(aes(y = median), color = "blue") +
-  
-  # observed
-  geom_point(aes(y = observed), color = "black", size = 2) +
-  geom_errorbar(aes(ymin = lower_obs, ymax = upper_obs), width = 0.4) +
-  
-  facet_wrap(~ compartment) +
+# Year is factor
+summary_all_years <- summary_all_years %>%
+  mutate(parameter_label = recode(parameter,
+                                  "lambda1" = "lambda[1]",
+                                  "lambda2" = "lambda[2]",
+                                  "sigma12" = "sigma[12]",
+                                  "sigma21" = "sigma[21]"
+  ))
+
+ggplot(summary_all_years, aes(x = factor(year), y = mean)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = q025, ymax = q975), width = 0.4) +
+  facet_wrap(~ parameter_label, scales = "free_y", labeller = label_parsed) +
   labs(
-    title = "Posterior Predictive Check",
-    x = "Age", y = "Probability"
+    title = "Posterior Mean and 95% CrI by Year",
+    y = "Estimate", x = "Year"
   ) +
-  theme_minimal()
-
-##PPC peru_1996
-age_fine <- seq(5, max(peru_1996$age), by=1)
-n_age_fine <- length(age_fine)
-stan_data <- list(
-  N = nrow(peru_1996),
-  age = peru_1996$age,
-  n_tested = peru_1996$n_tested,
-  n_s = peru_1996$n_s,
-  n_denv1 = peru_1996$n_denv1,
-  n_denv2 = peru_1996$n_denv2,
-  n_denv12 = peru_1996$n_denv12,
-  y = as.matrix(peru_1996[, c("n_s", "n_denv1", "n_denv2", "n_denv12")]),
-  age_fine = age_fine,
-  n_age_fine = n_age_fine
-)
+  theme_bw() +
+  theme(legend.position = "none",
+        strip.text = element_text(size = 14))
 
 
 
-posterior <- rstan::extract(fit_peru_1996)
-
-y <- stan_data$y  
-n_tested <- stan_data$n_tested  
-age <- stan_data$age            
-
-# Predicted category probabilities = count / n_tested
-# y_rep: iterations x N x 4
-pred_probs <- array(NA, dim = dim(posterior$y_rep))  # 4000 x 13 x 4
-
-for (j in 1:4) {
-  pred_probs[,,j] <- sweep(posterior$y_rep[,,j], 2, n_tested, "/")
-}
-
-make_pred_df <- function(prob_matrix, age_vec, comp_name, obs_vals, n_vals) {
-  ci <- t(apply(prob_matrix, 2, quantile, probs = c(0.025, 0.5, 0.975)))
-  tibble(
-    age = age_vec,
-    median = ci[, 2],
-    lower = ci[, 1],
-    upper = ci[, 3],
-    observed = obs_vals / n_vals,
-    lower_obs = observed - 1.96 * sqrt(observed * (1 - observed) / n_vals),
-    upper_obs = observed + 1.96 * sqrt(observed * (1 - observed) / n_vals),
-    compartment = comp_name
+# Year is numeric
+summary_all_years <- summary_all_years %>%
+  mutate(
+    parameter_label = recode(parameter,
+                             "lambda1" = "lambda[1]",
+                             "lambda2" = "lambda[2]",
+                             "sigma12" = "sigma[12]",
+                             "sigma21" = "sigma[21]"
+    ),
+    year_numeric = as.numeric(as.character(year))
   )
-}
 
-prob_s <- 1 - pred_probs[, , 2] - pred_probs[, , 3] - pred_probs[, , 4]
-df_s   <- make_pred_df(prob_s, age, "Susceptible", y[, 1], n_tested)
-df_d1   <- make_pred_df(pred_probs[,,2], age, "DENV1 only", y[, 2], n_tested)
-df_d2   <- make_pred_df(pred_probs[,,3], age, "DENV2 only", y[, 3], n_tested)
-df_d12  <- make_pred_df(pred_probs[,,4], age, "DENV1 + DENV2", y[, 4], n_tested)
-
-df_ppc <- bind_rows(df_s, df_d1, df_d2, df_d12)
-
-get_ci_fine <- function(mat) {
-  apply(mat, 2, quantile, probs = c(0.025, 0.5, 0.975))
-}
-
-ci_s    <- get_ci_fine(posterior$prob_s)
-ci_d1   <- get_ci_fine(posterior$prob_x1)
-ci_d2   <- get_ci_fine(posterior$prob_x2)
-ci_d12  <- get_ci_fine(posterior$prob_x12)
-
-age_fine <- stan_data$age_fine
-
-df_smooth <- tibble(
-  age = rep(age_fine, 4),
-  median = c(ci_s[2,], ci_d1[2,], ci_d2[2,], ci_d12[2,]),
-  lower = c(ci_s[1,], ci_d1[1,], ci_d2[1,], ci_d12[1,]),
-  upper = c(ci_s[3,], ci_d1[3,], ci_d2[3,], ci_d12[3,]),
-  compartment = rep(c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2"), each = length(age_fine))
-)
-
-df_smooth <- df_smooth %>%
-  mutate(compartment = factor(compartment, levels = c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2")))
-
-df_ppc <- df_ppc %>%
-  mutate(compartment = factor(compartment, levels = c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2")))
-
-ggplot(df_ppc, aes(x = age)) +
-  # smooth line from age_fine
-  geom_ribbon(data = df_smooth, aes(x = age, ymin = lower, ymax = upper), fill = "red", alpha = 0.15, inherit.aes = FALSE) +
-  geom_line(data = df_smooth, aes(x = age, y = median), color = "red", linewidth = 0.8, inherit.aes = FALSE) +
-  
-  # predicted from y_rep
-  #geom_ribbon(aes(ymin = lower, ymax = upper), fill = "skyblue", alpha = 0.3) +
-  #geom_line(aes(y = median), color = "blue") +
-  
-  # observed
-  geom_point(aes(y = observed), color = "black", size = 2) +
-  geom_errorbar(aes(ymin = lower_obs, ymax = upper_obs), width = 0.4) +
-  
-  facet_wrap(~ compartment) +
+ggplot(summary_all_years, aes(x = year_numeric, y = mean)) +
+  geom_line(linetype=3) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = q025, ymax = q975), width = 0.4) +
+  # Threshold lines only for sigma panels
+  geom_hline(data = subset(summary_all_years, parameter %in% c("sigma12", "sigma21")),
+             aes(yintercept = 1), linetype = "dashed", color = "red") +
+  scale_x_continuous(breaks = unique(summary_all_years$year_numeric)) +
+  facet_wrap(~ parameter_label, scales = "free_y", labeller = label_parsed) +
   labs(
-    title = "Posterior Predictive Check",
-    x = "Age", y = "Probability"
+    title = "Posterior Mean and 95% CrI by Year",
+    y = "Estimate", x = "Year"
   ) +
-  theme_minimal()
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(size = 14)
+  )
 
+# Combine
+summary_all_years <- summary_all_years %>%
+  mutate(
+    year_numeric = as.numeric(as.character(year)),
+    label = recode(parameter,
+                   "lambda1" = "lambda[1]",
+                   "lambda2" = "lambda[2]",
+                   "sigma12" = "sigma[12]",
+                   "sigma21" = "sigma[21]"),
+    group = case_when(
+      parameter %in% c("lambda1", "lambda2") ~ "lambda",
+      parameter %in% c("sigma12", "sigma21") ~ "sigma"
+    )
+  )
+
+position_dodge_val <- position_dodge(width = 0.5)
+
+ggplot(summary_all_years, aes(x = year_numeric, y = mean, color = label)) +
+  geom_line(aes(group = label), linetype = "dotted", position = position_dodge_val) +
+  geom_point(aes(group = label), size = 2, position = position_dodge_val) +
+  geom_errorbar(aes(ymin = q025, ymax = q975, group = label), width = 0.4, position = position_dodge_val) +
+  
+  geom_hline(data = filter(summary_all_years, group == "sigma"),
+             aes(yintercept = 1), linetype = "dashed", color = "red", inherit.aes = FALSE) +
+  
+  scale_color_manual(
+    name = "Parameter",
+    values = c("lambda[1]" = "#1b9e77", "lambda[2]" = "#d95f02",
+               "sigma[12]" = "steelblue", "sigma[21]" = "#e7298a"),
+    labels = c(
+      expression(lambda[1]),
+      expression(lambda[2]),
+      expression(sigma[12]),
+      expression(sigma[21])
+    )
+  ) +
+  scale_x_continuous(breaks = unique(summary_all_years$year_numeric)) +
+  facet_wrap(~ group, scales = "free_y", labeller = label_parsed) +
+  labs(
+    title = "Posterior Mean and 95% CrI by Year",
+    x = "Year", y = "Estimate"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "top",
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 13),
+    strip.text = element_text(size = 14)
+  )
+
+
+#### POSTERIOR PREDICTIVE CHECK
+make_ppc_plot <- function(data_name, data, fit) {
+  age_fine <- seq(5, max(data$age), by=1)
+  n_age_fine <- length(age_fine)
+  stan_data <- list(
+    N = nrow(data),
+    age = data$age,
+    n_tested = data$n_tested,
+    n_s = data$n_s,
+    n_denv1 = data$n_denv1,
+    n_denv2 = data$n_denv2,
+    n_denv12 = data$n_denv12,
+    y = as.matrix(data[, c("n_s", "n_denv1", "n_denv2", "n_denv12")]),
+    age_fine = age_fine,
+    n_age_fine = n_age_fine
+  )
+  posterior <- rstan::extract(fit)
+  y <- stan_data$y
+  n_tested <- stan_data$n_tested
+  age <- stan_data$age
+  age_fine <- stan_data$age_fine
+  
+  # Predicted probabilities
+  pred_probs <- array(NA, dim = dim(posterior$y_rep))
+  for (j in 1:4) {
+    pred_probs[,,j] <- sweep(posterior$y_rep[,,j], 2, n_tested, "/")
+  }
+  
+  make_pred_df <- function(prob_matrix, age_vec, comp_name, obs_vals, n_vals) {
+    ci <- t(apply(prob_matrix, 2, quantile, probs = c(0.025, 0.5, 0.975)))
+    tibble(
+      age = age_vec,
+      median = ci[, 2],
+      lower = ci[, 1],
+      upper = ci[, 3],
+      observed = obs_vals / n_vals,
+      lower_obs = observed - 1.96 * sqrt(observed * (1 - observed) / n_vals),
+      upper_obs = observed + 1.96 * sqrt(observed * (1 - observed) / n_vals),
+      compartment = comp_name
+    )
+  }
+  
+  # Posterior predictive data frame
+  prob_s <- 1 - pred_probs[, , 2] - pred_probs[, , 3] - pred_probs[, , 4]
+  df_s   <- make_pred_df(prob_s, age, "Susceptible", y[, 1], n_tested)
+  df_d1  <- make_pred_df(pred_probs[,,2], age, "DENV1 only", y[, 2], n_tested)
+  df_d2  <- make_pred_df(pred_probs[,,3], age, "DENV2 only", y[, 3], n_tested)
+  df_d12 <- make_pred_df(pred_probs[,,4], age, "DENV1 + DENV2", y[, 4], n_tested)
+  
+  df_ppc <- bind_rows(df_s, df_d1, df_d2, df_d12) %>%
+    mutate(compartment = factor(compartment, levels = c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2")))
+  
+  get_ci_fine <- function(mat) {
+    apply(mat, 2, quantile, probs = c(0.025, 0.5, 0.975))
+  }
+  
+  ci_s    <- get_ci_fine(posterior$prob_s)
+  ci_d1   <- get_ci_fine(posterior$prob_x1)
+  ci_d2   <- get_ci_fine(posterior$prob_x2)
+  ci_d12  <- get_ci_fine(posterior$prob_x12)
+  
+  df_smooth <- tibble(
+    age = rep(age_fine, 4),
+    median = c(ci_s[2,], ci_d1[2,], ci_d2[2,], ci_d12[2,]),
+    lower = c(ci_s[1,], ci_d1[1,], ci_d2[1,], ci_d12[1,]),
+    upper = c(ci_s[3,], ci_d1[3,], ci_d2[3,], ci_d12[3,]),
+    compartment = rep(c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2"), each = length(age_fine))
+  ) %>%
+    mutate(compartment = factor(compartment, levels = c("Susceptible", "DENV1 only", "DENV2 only", "DENV1 + DENV2")))
+  
+  title_text <- paste0(
+    "<span style='font-size:16pt'><b>Posterior Predictive Check of age-stratified infection probabilities: </b></span><br>",
+    "<span style='font-size:14pt'><b>Model estimates versus real-world data of ",
+    data_name,
+    "</b></span><br>",
+    "<span style='font-size:12pt'>The red lines represent the model's mean posterior predictions, and the shaded areas show the 95% credible intervals.</span><br>",
+    "<span style='font-size:12pt'>Observed data points with binomial confidence intervals are overlaid as black points and error bars.</span>"
+  )
+  
+  ggplot(df_ppc, aes(x = age)) +
+    geom_ribbon(data = df_smooth, aes(x = age, ymin = lower, ymax = upper), fill = "red", alpha = 0.15, inherit.aes = FALSE) +
+    geom_line(data = df_smooth, aes(x = age, y = median), color = "red", linewidth = 0.8, inherit.aes = FALSE) +
+    geom_point(aes(y = observed), color = "black", size = 2) +
+    geom_errorbar(aes(ymin = lower_obs, ymax = upper_obs), width = 0.4) +
+    facet_wrap(~ compartment) +
+    labs(
+      title = title_text,
+      x = "Age", y = "Probability"
+    ) +
+    theme_bw() +
+    theme(
+      plot.title = ggtext::element_markdown(),
+      plot.title.position = "plot",
+      strip.text = element_text(size = 14)
+    )
+}
+
+make_ppc_plot(data_name = "Peru 2010", data=peru_2010, fit=fit_peru_2010) 
+make_ppc_plot(data_name = "Peru 2008", data=peru_2008, fit=fit_peru_2008)
+make_ppc_plot(data_name = "Peru 2006", data=peru_2006, fit=fit_peru_2006)
+make_ppc_plot(data_name = "Peru 2004", data=peru_2004, fit=fit_peru_2004)
+make_ppc_plot(data_name = "Peru 2002", data=peru_2002, fit=fit_peru_2002)
+make_ppc_plot(data_name = "Peru 2001", data=peru_2001, fit=fit_peru_2001)
+make_ppc_plot(data_name = "Peru 1999", data=peru_1999, fit=fit_peru_1999)
+make_ppc_plot(data_name = "Peru 1996", data=peru_1996, fit=fit_peru_1996)
+make_ppc_plot(data_name = "Peru 1995", data=peru_1995, fit=fit_peru_1995)
+make_ppc_plot(data_name = "Peru 1994", data=peru_1994, fit=fit_peru_1994)
+make_ppc_plot(data_name = "Peru 1993", data=peru_1993, fit=fit_peru_1993)
 
 
